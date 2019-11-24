@@ -8,6 +8,7 @@
 #include <linux/kdev_t.h>
 #include <linux/uaccess.h>
 #include <linux/errno.h>
+#include <linux/device.h>
 
 MODULE_LICENSE("Dual BSD/GPL");
 
@@ -17,7 +18,7 @@ static struct device *my_device;
 static struct cdev *my_cdev;
 
 int lifo[10];
-int pos = -1;
+int pos = 0;
 int endRead = 0;
 
 int lifo_open(struct inode *pinode, struct file *pfile);
@@ -51,22 +52,20 @@ ssize_t lifo_read(struct file *pfile, char __user *buffer, size_t length, loff_t
 {
 	int ret;
 	char buff[20];
-	long int len;
+	long int len = 0;
 	if (endRead){
 		endRead = 0;
 		return 0;
 	}
 
-	len = scnprintf(buff, strlen(buff), "%d ", lifo[pos]);
-
-	if(pos >= 0)
+	if(pos > 0)
 	{
+		pos --;
+		len = scnprintf(buff, strlen(buff), "%d ", lifo[pos]);
 		ret = copy_to_user(buffer, buff, len);
 		if(ret)
 			return -EFAULT;
-		pos --;
 		printk(KERN_INFO "Succesfully read\n");
-
 	}
 	else
 	{
@@ -88,24 +87,23 @@ ssize_t lifo_write(struct file *pfile, const char __user *buffer, size_t length,
 		return -EFAULT;
 	buff[length-1] = '\0';
 
-	ret = sscanf(buff,"%d",&value);
-
-	if(ret==1)//one parameter parsed in sscanf
+	if(pos<10)
 	{
-		if(pos<9)
+		ret = sscanf(buff,"%d",&value);
+		if(ret==1)//one parameter parsed in sscanf
 		{
-			pos++;
-			lifo[pos] = value; 
 			printk(KERN_INFO "Succesfully wrote value %d", value); 
+			lifo[pos] = value; 
+			pos=pos+1;
 		}
 		else
 		{
-			printk(KERN_WARNING "Lifo is full\n"); 
+			printk(KERN_WARNING "Wrong command format\n");
 		}
 	}
 	else
 	{
-		printk(KERN_WARNING "Wrong command format\n");
+		printk(KERN_WARNING "Lifo is full\n"); 
 	}
 
 	return length;
