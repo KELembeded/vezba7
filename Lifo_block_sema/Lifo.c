@@ -10,6 +10,7 @@
 #include <linux/errno.h>
 #include <linux/device.h>
 #include <linux/wait.h>
+#include <linux/semaphore.h>
 
 MODULE_LICENSE("Dual BSD/GPL");
 
@@ -20,6 +21,8 @@ static struct cdev *my_cdev;
 
 DECLARE_WAIT_QUEUE_HEAD(readQ);
 DECLARE_WAIT_QUEUE_HEAD(writeQ);
+struct semaphore sem;
+
 
 int lifo[10];
 int pos = 0;
@@ -62,8 +65,17 @@ ssize_t lifo_read(struct file *pfile, char __user *buffer, size_t length, loff_t
 		return 0;
 	}
 
-	if(wait_event_interruptible(readQ,(pos>0)))
+	if(down_interruptible(&sem))
 		return -ERESTARTSYS;
+	while(pos == 0)
+	{
+		up(&sem);
+		if(wait_event_interruptible(readQ,(pos>0)))
+			return -ERESTARTSYS;
+		if(down_interruptible(&sem))
+			return -ERESTARTSYS;
+	}
+
 
 	if(pos > 0)
 	{
@@ -79,6 +91,7 @@ ssize_t lifo_read(struct file *pfile, char __user *buffer, size_t length, loff_t
 			printk(KERN_WARNING "Lifo is empty\n"); 
 	}
 
+	up(&sem);
 	wake_up_interruptible(&writeQ);
 
 	endRead = 1;
@@ -96,8 +109,16 @@ ssize_t lifo_write(struct file *pfile, const char __user *buffer, size_t length,
 		return -EFAULT;
 	buff[length-1] = '\0';
 
-	if(wait_event_interruptible(writeQ,(pos<10)))
+	if(down_interruptible(&sem))
 		return -ERESTARTSYS;
+	while(pos == 10)
+	{
+		up(&sem);
+		if(wait_event_interruptible(writeQ,(pos<10)))
+			return -ERESTARTSYS;
+		if(down_interruptible(&sem))
+			return -ERESTARTSYS;
+	}
 
 	if(pos<10)
 	{
@@ -118,6 +139,7 @@ ssize_t lifo_write(struct file *pfile, const char __user *buffer, size_t length,
 		printk(KERN_WARNING "Lifo is full\n"); 
 	}
 
+	up(&sem);
 	wake_up_interruptible(&readQ);
 
 	return length;
@@ -127,6 +149,8 @@ static int __init lifo_init(void)
 {
    int ret = 0;
 	int i=0;
+	
+	sema_init(&sem,1);
 
 	//Initialize array
 	for (i=0; i<10; i++)
