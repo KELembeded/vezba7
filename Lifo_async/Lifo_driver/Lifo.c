@@ -11,7 +11,7 @@
 #include <linux/device.h>
 #include <linux/wait.h>
 #include <linux/semaphore.h>
-
+#define BUFF_SIZE 20
 MODULE_LICENSE("Dual BSD/GPL");
 
 dev_t my_dev_id;
@@ -65,7 +65,7 @@ int lifo_close(struct inode *pinode, struct file *pfile)
 ssize_t lifo_read(struct file *pfile, char __user *buffer, size_t length, loff_t *offset) 
 {
 	int ret;
-	char buff[20];
+	char buff[BUFF_SIZE];
 	long int len = 0;
 	if (endRead){
 		endRead = 0;
@@ -87,7 +87,7 @@ ssize_t lifo_read(struct file *pfile, char __user *buffer, size_t length, loff_t
 	if(pos > 0)
 	{
 		pos --;
-		len = scnprintf(buff, strlen(buff), "%d ", lifo[pos]);
+		len = scnprintf(buff, BUFF_SIZE, "%d ", lifo[pos]);
 		ret = copy_to_user(buffer, buff, len);
 		if(ret)
 			return -EFAULT;
@@ -107,7 +107,7 @@ ssize_t lifo_read(struct file *pfile, char __user *buffer, size_t length, loff_t
 
 ssize_t lifo_write(struct file *pfile, const char __user *buffer, size_t length, loff_t *offset) 
 {
-	char buff[20];
+	char buff[BUFF_SIZE];
 	int value;
 	int ret;
 
