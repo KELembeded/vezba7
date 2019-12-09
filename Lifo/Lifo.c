@@ -66,13 +66,13 @@ ssize_t lifo_read(struct file *pfile, char __user *buffer, size_t length, loff_t
 		if(ret)
 			return -EFAULT;
 		printk(KERN_INFO "Succesfully read\n");
+		endRead = 1;
 	}
 	else
 	{
 			printk(KERN_WARNING "Lifo is empty\n"); 
 	}
 
-	endRead = 1;
 	return len;
 }
 
